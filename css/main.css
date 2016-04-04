@@ -1,0 +1,69 @@
+.container{
+	padding-top: 1%;
+}
+.menu{
+	background-color: #EAEBEA;	
+	float: left;
+}
+.menu > ul {
+	padding: 0;	
+	
+}
+
+.menu ul>li{
+	list-style-type: none;
+	text-align: left;
+	text-transform: uppercase;
+	line-height: 1.5;
+	font-size: 1em;
+	margin: 20px 0px;
+	padding: 10px 10px;
+	border:2px solid #3D3E3F;
+}
+
+
+.menu ul>li:hover{
+	list-style-type: none;
+	text-align: left;
+	text-transform: uppercase;
+	line-height: 1.5;
+	font-size: 1em;
+	margin: 20px 0px;
+	padding: 10px 10px;
+	border:2px solid #3D3E3F;
+	background-color: #000000;
+	color: #fff;
+}
+
+.content{
+	background-color: #FFF;
+	float: right;
+}
+
+.table-hover{
+	
+}
+
+form{
+    display: inline-block;
+}
+form > p{
+	font-size: 1.4em;
+}
+
+select {
+    border-radius: 0;
+    background: #EAEBEA;
+    height: 33px;
+    padding: 5px;
+    border: 0;
+    font-size: 16px;
+    line-height: 1;
+    -webkit-appearance: none;
+    width: 180px;
+   }
+
+.grBtn{
+	width: 200px;
+	margin: 5px 0;
+}
