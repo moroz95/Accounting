@@ -9,7 +9,7 @@
 ## 2
 Создайте в каталоге db файл db_settings.php и добавьте в него следующее:<br>
 `<?php`<br>
-`$dbhost = "localhost"; //или имя хоста, если БД не на локальном сервере`<br>
-`$dbname = "accounting_performance"; //имя вашей БД`<br>
-`$dbusername = "root"; //ваш логин`<br>
-`$dbpassword = "root"; //ваш пароль`<br>
+`$db_host = "localhost"; //или имя хоста, если БД не на локальном сервере`<br>
+`$db_name = "accounting_performance"; //имя вашей БД`<br>
+`$db_username = "root"; //ваш логин`<br>
+`$db_password = "root"; //ваш пароль`<br>
