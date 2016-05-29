@@ -15,28 +15,33 @@ class StudentController extends Controller
 
     /**
      * Action to show edit form
+     * Action to update student data
      *
      * @param int $student_id
      */
     function actionEdit($student_id)
     {
+        Validator::setPost();
+        $error = false;
+
         $row = $this->model->getStudentData($student_id);
         $similar_groups = $this->model->getSimilarGroups($student_id);
-        $current_group = $this->model->getGroup($student_id);
-        $content = '../views/students/edit.php';
-        include '../views/main.php';
-    }
+        $current_group = $this->model->getGroupNumber($student_id);
 
-    /**
-     * Action to update student data
-     *
-     * @param int $student_id
-     */
-    function actionUpdate($student_id)
-    {
-        $current_group = $this->model->getGroup($student_id);
-        $this->model->update($student_id);
-        header("Location:/group/view/$current_group");
+        if(Validator::validateId($student_id))
+        {
+            if($this->model->updateStudent($student_id, Validator::$post_data))
+            {
+                header("Location:/group/view/$current_group");
+            }
+            else $error = "Ошибка добавления";
+
+        }
+
+        $this->view->render('students/edit', array(
+            'row' => $row, 'similar_groups' => $similar_groups, 'current_group' => $current_group, 'student_id' => $student_id
+        ), $error);
+
 
     }
 
@@ -44,32 +49,53 @@ class StudentController extends Controller
      * Action to show add form
      * in case of POST request add new student and redirect to group view
      *
+     * TODO implement validation for student form
+     *
      * @param int $group_number
      */
     function actionAdd($group_number)
     {
-        if(isset($_POST['submit']))
+        Validator::setPost();
+        $error = false;
+
+        if(Validator::validateId($group_number))
         {
-            $this->model->add($group_number);
-            header("Location:/group/view/$group_number");
+            if($this->model->addStudentToGroup($group_number, Validator::$post_data))
+            {
+                header("Location:/group/view/$group_number");
+            }
+            else $error = 'Ошибка добавления';
+
         }
-        else {
-            $content = "../views/students/add.php";
-            include '../views/main.php';
+        else if(!Validator::isNumber($group_number))
+        {
+            $error = 'Ошибка id';
         }
+
+        $this->view->render('students/add', array('group_number' => $group_number), $error);
     }
 
     /**
      * Action to delete student
      * redirect to group view
      *
+     * TODO implement error message
+     *
      * @param int $student_id
      */
     function actionDelete($student_id)
     {
-        $current_group = $this->model->getGroup($student_id);
-        $this->model->delete($student_id);
-        header("Location:/group/view/$current_group");
+
+        $current_group = $this->model->getGroupNumber($student_id);
+        if($this->model->deleteStudent($student_id) && Validator::isNumber($student_id))
+        {
+            header("Location:/group/view/$current_group");
+        }
+        else
+        {
+            $this->view->renderPartial('main', array(), 'Ошибка удаления');
+        }
+
     }
 
 

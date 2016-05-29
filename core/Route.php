@@ -19,8 +19,10 @@ class Route
     {
         error_reporting(E_ALL);
 
+        include '../core/Validator.php';
         include '../core/Model.php';
         include '../core/Controller.php';
+        include '../core/View.php';
 
         session_start();
         
@@ -41,9 +43,14 @@ class Route
 
         if( !empty($routes[3]) )
         {
-            $parameter = $routes[3];
+            $parameter[0] = $routes[3];
         }
 
+        if( !empty($routes[4]) )
+        {
+            $parameter[1] = $routes[4];
+        }
+        
         $model_name = $controller_name.'Model';
         $controller_name = $controller_name.'Controller';
         $action_name = 'action'.$action_name;
@@ -73,7 +80,7 @@ class Route
 
         if(method_exists($controller, $action))
         {
-            $controller->$action($parameter);
+            $controller->$action($parameter[0], $parameter[1]);
         }
         else
         {

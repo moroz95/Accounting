@@ -11,8 +11,9 @@ class StatModel extends Model
      */
     public function getGroupsData()
     {
-        $query = mysqli_query($this->connection, "SELECT * FROM `groups`");
-        while ($temp = mysqli_fetch_array($query)) {
+        $stm = $this->connection->query("SELECT * FROM `groups`");
+
+        while ($temp = $stm->fetch()) {
             $groups[] = $temp;
         }
 
@@ -24,8 +25,9 @@ class StatModel extends Model
      */
     public function getExamsData()
     {
-        $query = mysqli_query($this->connection, "SELECT * FROM `exams`");
-        while ($temp = mysqli_fetch_array($query)) {
+        $stm = $this->connection->query("SELECT * FROM `exams`");
+
+        while ($temp = $stm->fetch()) {
             $exams[] = $temp;
         }
 
@@ -39,11 +41,12 @@ class StatModel extends Model
     public function getStudentsData($group_number)
     {
         $group_number = (int)$group_number;
-        $students = mysqli_query($this->connection, "SELECT * FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = $group_number ");
-        while ($row = mysqli_fetch_array($students)) {
-            $rows[] = $row;
-        }
-        return $rows;
+
+        $stm = $this->connection->prepare("SELECT * FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = ?");
+        $stm->execute(array($group_number));
+
+        $students = $stm->fetchAll();
+        return $students;
     }
 
     /**
@@ -52,9 +55,10 @@ class StatModel extends Model
      */
     public function getExamData($exam_id)
     {
-        $exams = mysqli_query($this->connection, "SELECT * FROM `exams` WHERE `id`= $exam_id ");
-        $row = mysqli_fetch_array($exams);
-        return $row;
+        $stm = $this->connection->prepare("SELECT * FROM `exams` WHERE `id`=?");
+        $stm->execute(array($exam_id));
+        $exam = $stm->fetch();
+        return $exam;
     }
 
     /**
@@ -65,21 +69,25 @@ class StatModel extends Model
     public function getStudentMark($student_id, $exam_title)
     {
         $exam_id = $this->getExamId($exam_title);
-        $result = mysqli_query($this->connection, "SELECT `exam_eval` FROM `exams_eval` WHERE `student`=$student_id AND `exam_id`=$exam_id");
-        $result = mysqli_fetch_array($result);
-        return $result[0];
+        $stm = $this->connection->prepare("SELECT `exams_eval`.`exam_eval` FROM `exams_eval` WHERE `exams_eval`.`student` = ? AND `exams_eval`.`exam_id` = ?");
+        $stm->execute(array($student_id, $exam_id));
+        $result = $stm->fetch()[0];
+        return $result;
     }
 
     /**
      * @param $exam_title
      * @return mixed
+     *
+     * TODO change exam_title for exam_id
+     *
      */
     public function getExamId($exam_title)
     {
         $exam_title = iconv("utf-8", "cp1251", $exam_title);
-        $exam =  mysqli_query($this->connection, "SELECT * FROM `exams` WHERE `exam_title`='$exam_title'");
-        $ex_row = mysqli_fetch_array($exam);
-        $exam_id = $ex_row[0];
+        $stm =  $this->connection->prepare("SELECT * FROM `exams` WHERE `exam_title`=?");
+        $stm->execute(array($exam_title));
+        $exam_id = $stm->fetch()[0];
         return $exam_id;
     }
 
@@ -89,9 +97,10 @@ class StatModel extends Model
      */
     public function countStudentExams($student_id)
     {
-        $ex = mysqli_query($this->connection, "SELECT COUNT(`exam_id`) FROM `exams_eval` WHERE `student`= $student_id");
-        $exa = mysqli_fetch_array($ex);//$exa['0'] - количество сданных экзаменов
-        return $exa['0'];
+        $stm = $this->connection->prepare("SELECT COUNT(`exam_id`) FROM `exams_eval` WHERE `student`= ?");
+        $stm->execute(array($student_id));
+
+        return $stm->fetch()['0'];
     }
 
     /**
@@ -100,9 +109,10 @@ class StatModel extends Model
      */
     public function getAverageMark($student_id)
     {
-        $evals = mysqli_query($this->connection, "SELECT AVG(`exam_eval`) FROM `exams_eval` WHERE `student`= $student_id");
-        $evl=mysqli_fetch_array($evals);//$evl['0'] - сама оценка
-        return $evl['0'];
+        $stm = $this->connection->prepare("SELECT AVG(`exam_eval`) FROM `exams_eval` WHERE `student`= ?");
+        $stm->execute(array($student_id));
+
+        return $stm->fetch()['0'];
     }
 
     /**
@@ -111,9 +121,9 @@ class StatModel extends Model
      */
     public function countStudents($group_number)
     {
-        $std_count = mysqli_query($this->connection, "SELECT COUNT(`id`) FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = $group_number");
-        $std_c = mysqli_fetch_array($std_count);//$std_c['0'] - количество студентов в группе
-        return $std_c['0'];
+        $stm = $this->connection->prepare("SELECT COUNT(`id`) FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = ?");
+        $stm->execute(array($group_number));
+        return $stm->fetch()['0'];
     }
 
     /**
@@ -151,5 +161,26 @@ class StatModel extends Model
         } elseif ($average == 5) {
             return "Отлично";
         }
+    }
+
+    public function setStudentsMark($students, $exam_title)
+    {
+        foreach ($students as &$student)
+        {
+            $student['mark'] = $this->getStudentMark($student['id'], $exam_title);
+        }
+
+        return $students;
+    }
+
+    public function setAverageData($students)
+    {
+        foreach ($students as &$student)
+        {
+            $student['count'] = $this->countStudentExams($student['id']);
+            $student['mark'] = $this->getAverageMark($student['id']);
+        }
+
+        return $students;
     }
 }

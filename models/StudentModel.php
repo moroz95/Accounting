@@ -9,6 +9,8 @@
  * @package Student
  * @subpackage Model
  */
+
+
 class StudentModel extends Model
 {
     /**
@@ -23,8 +25,9 @@ class StudentModel extends Model
      */
     public function getStudentData($student_id)
     {
-        $groups = mysqli_query($this->connection, "SELECT * FROM `students` WHERE `id`= $student_id");
-        $this->student_data = mysqli_fetch_array($groups);
+        $stm = $this->connection->prepare("SELECT * FROM `students` WHERE `id`= ? ");
+        $stm->execute(array($student_id));
+        $this->student_data = $stm->fetch();
         return $this->student_data;
     }
 
@@ -32,10 +35,11 @@ class StudentModel extends Model
      * @param  integer $student_id
      * @return int
      */
-    public function getGroup($student_id)
+    public function getGroupNumber($student_id)
     {
-        $current_group = mysqli_query($this->connection, "SELECT `student_group` FROM `students_groups` WHERE `student`= $student_id ");
-        $current_group = mysqli_fetch_array($current_group);
+        $stm = $this->connection->prepare("SELECT `student_group` FROM `students_groups` WHERE `student`= ? ");
+        $stm->execute(array($student_id));
+        $current_group = $stm->fetch();
         return (int)$current_group['student_group'];
     }
 
@@ -45,66 +49,75 @@ class StudentModel extends Model
      */
     public function getSimilarGroups($student_id)
     {
-        ($this->student_data) ?: $this->student_data = $this->getStudentData($student_id);
+        ($this->student_data) ?: $this->student_data = $this->studentDataById($student_id);
         $income = $this->student_data['income_year'];
-        $query = mysqli_query($this->connection, "SELECT * FROM `groups` WHERE `formation_date`='$income' ");
-        while ($temp = mysqli_fetch_array($query)) {
-            $similar_groups[] = $temp;
-        }
+        $stm = $this->connection->prepare("SELECT * FROM `groups` WHERE `formation_date`= ? ");
+        $stm->execute(array($income));
+        $similar_groups = $stm->fetchAll();
         return $similar_groups;
     }
 
     /**
-     * @param integer $student_id
+     * @param $student_id
+     * @return bool
      */
-    public function delete($student_id)
+    public function deleteStudent($student_id)
     {
-        mysqli_query($this->connection, "DELETE FROM `students` WHERE `id`='$student_id'");
-        mysqli_query($this->connection, "DELETE FROM `exams_eval` WHERE `student`='$student_id'");
+        $stm = $this->connection->prepare("DELETE FROM `students` WHERE `id`=?");
+        $stm->execute(array($student_id));
+        $stm_2 = $this->connection->prepare("DELETE FROM `exams_eval` WHERE `student`=?");
+        $stm_2->execute(array($student_id));
+        return ($stm && $stm_2);
     }
 
     /**
+     *
+     * TODO Implement transaction
+     *
      * @param $student_id
+     * @param $data
+     *
+     * @return bool
      */
-    public function update($student_id)
+    public function updateStudent($student_id, $data)
     {
-        foreach ($_POST as $key => $value)
-        {
-            $$key = iconv("utf-8", "cp1251", $value);
-        }
+        $stm = $this->connection->prepare("UPDATE `students` SET `name`=?,`sname`=?,`oname`=?,`birthday`=?,`gradebook_number`=?  WHERE `id`= ?");
+        $stm->execute(array($data['studName'], $data['studSname'], $data['studOname'], $data['studBirth'], $data['studGradebook'], $student_id));
 
-        mysqli_query($this->connection, "UPDATE `students` SET `name`='$studName',`sname`='$studSname',`oname`='$studOname',`birthday`='$studBirth',`gradebook_number`='$studGradebook'  WHERE `id`= $student_id");
-        mysqli_query($this->connection, "UPDATE `students_groups` SET `student_group`=$studGroup WHERE `student`= $student_id");
+        $stm_2 = $this->connection->prepare("UPDATE `students_groups` SET `student_group`=? WHERE `student`= ?");
+        $stm_2->execute(array($data['studGroup'], $student_id));
+
+        return ($stm && $stm_2);
     }
 
     /**
      * @param $group_number
+     * @param $data
+     * @return bool
      */
-    public function add($group_number)
+    public function addStudentToGroup($group_number, $data)
     {
-        foreach ($_POST as $key => $value)
+        extract($data);
+
+        $stm = $this->connection->prepare("SELECT * FROM `groups` WHERE `group_number`= ? ");
+        $stm->execute(array($group_number));
+
+        if ($student = $stm->fetch())
         {
-            $$key = iconv("utf-8", "cp1251", $value);
+            $income_year = $student[1];
+            $stm = $this->connection->prepare("INSERT INTO `students`(`name`, `sname`, `oname`, `birthday`, `gradebook_number`, `income_year`) VALUES (?, ?, ?, ?, ?, ?)");
+            $stm->execute(array($studName, $studSname,$studOname,$studBirth, $studGradebook, $income_year));
+
+            $stm_2 = $this->connection->prepare("SELECT * FROM `students` WHERE `name`=? AND `sname`=? AND `oname`=? AND `gradebook_number`=?");
+            $stm_2->execute(array($studName, $studSname, $studOname, $studGradebook));
+            $student_id = $stm_2->fetch()[0];
+
+            $stm_3 = $this->connection->prepare("INSERT INTO `students_groups`(`student`, `student_group`) VALUES (?, ?)");
+            $stm_3->execute(array($student_id, $group_number));
+
+            return $stm && $stm_2 && $stm_3;
         }
-
-        $students = mysqli_query($this->connection, "SELECT * FROM `groups` WHERE `group_number`= $group_number");
-        if ($row = mysqli_fetch_array($students)) {
-            $stud_income_year = $row[1];//$row[1] - дата формирования группы
-
-            //Узнав эту дату записываем её как год поступления этого студента в таблицу students
-            mysqli_query($this->connection, "INSERT INTO `students`(`name`, `sname`, `oname`, `birthday`, `gradebook_number`, `income_year`) VALUES ('$studName','$studSname','$studOname','$studBirth','$studGradebook','$stud_income_year')");
-
-            //Связываем сдудента с группой (таблица students_groups)
-            //Находим в таблице students только что добвленного предыдущей командой студента
-            $query = mysqli_query($this->connection, "SELECT * FROM `students` WHERE `name`='$studName' AND `sname`='$studSname' AND `oname`='$studOname' AND `gradebook_number`='$studGradebook'");
-
-            //Связываем студента и его группу
-            $temp = mysqli_fetch_array($query);
-            $std_id = $temp[0];// id студента в таблице students
-            //группа в которую добавили студента $stud_group_numb;
-            mysqli_query($this->connection, "INSERT INTO `students_groups`(`student`, `student_group`) VALUES ('$std_id','$group_number')");
-        }
-
+        else return false;
 
     }
 }

@@ -21,34 +21,33 @@ class ExamController extends Controller
      */
     function actionIndex($sort)
     {
-        $rows = $this->model->viewExams($sort);
-        $content = '../views/exams/index.php';
-        include '../views/main.php';
+        $exams = $this->model->getExamsData($sort);
+        $this->view->render('exams/index', array('exams' => $exams));
     }
 
+
     /**
-     * Action to show edit form
+     * Action to edit exam data
+     * to show edit form, in case of POST request update exam
+     *
+     * TODO check database for valid id
      *
      * @param int $exam_id
      */
     function actionEdit($exam_id)
     {
-        $exam_id = (int)$exam_id;
-        $row = $this->model->viewEditForm($exam_id);
-        $content = '../views/exams/edit.php';
-        include '../views/main.php';
-    }
+        $exam_id = ($exam_id == false) ? (int)$exam_id : $exam_id;
+        $exam_data = array();
 
-    /**
-     * Action to update exam data
-     *
-     * @param int $exam_id
-     */
-    function actionUpdate($exam_id)
-    {
-        $exam_id = (int)$exam_id;
-        $this->model->update($exam_id);
-        header("Location:/exam");
+        Validator::setPost();
+        if (Validator::validateId($exam_id)){
+            $this->model->updateExam(Validator::$post_data, $exam_id) ? header("Location:/exam") : $error = 'Неправильный id';
+        }
+        else {
+            Validator::isNumber($exam_id) ? $exam_data = $this->model->getExamDataById($exam_id) : $error = 'Неправильный id';
+
+        }
+        $this->view->render('exams/edit', array('exam_data' => $exam_data, 'exam_id' => $exam_id), $error);
     }
 
     /**
@@ -56,31 +55,27 @@ class ExamController extends Controller
      */
     function actionAdd()
     {
-        if(isset($_POST['examName']))
+        Validator::setPost();
+        if(Validator::$post_data)
         {
-            $this->model->addExam();
+            $this->model->addExam(Validator::$post_data);
             header("Location:/exam");
-
         }
         else {
-            $content = '../views/exams/add.php';
-            include '../views/main.php';
+            $this->view->render('exams/add');
         }
     }
 
     /**
      * Action to view groups to choose
      *
-     * @param string $exam_title
+     * @param string $exam_id
      */
-    function actionView($exam_title)
+    function actionView($exam_id)
     {
-
-        $_SESSION['exam_title'] = urldecode(preg_replace('/%u([0-9A-F]{4})/se','iconv("UTF-16BE", "UTF-8", pack("H4", "$1"))', $exam_title));
+        $exam_title = $this->model->getExamTitle((int)$exam_id);
         $rows = $this->model->viewGroups();
-        $content = "../views/exams/group.php";
-        include '../views/main.php';
-
+        $this->view->render('exams/group', array('exam_title' => $exam_title, 'exam_id' => $exam_id, 'rows' => $rows));
     }
 
     /**
@@ -93,28 +88,35 @@ class ExamController extends Controller
         $exam_id = (int)$exam_id;
         $result = $this->model->delete($exam_id);
         if (!$result) {
-            echo "Ошибка.";
+            $this->view->renderPartial('main',array('content'=>'Ошибка при удалении'));
         }
-        header("Location:/exam");
+        else
+        {
+            header("Location:/exam");
+        }
+
     }
 
     /**
-     * Action to show 
-     *
      * @param $group_number
+     * @param $exam_id
      */
-    function actionGroup($group_number)
+    function actionGroup($group_number, $exam_id)
     {
+        $exam_id = (int)$exam_id;
+        Validator::setPost();
         if(!isset($_POST['submit'])) {
-            $rows = $this->model->getExamData($group_number);
-            $exam_type = $this->model->getExamType($_SESSION['exam_title']);
-            $exam_id = $this->model->getExamId($_SESSION['exam_title']);
-            $content = '../views/exams/view.php';
-            include '../views/main.php';
+            $rows = $this->model->getExamDataByGroup($group_number);
+            $rows = $this->model->setStudentsMarks($rows, $exam_id);
+            $exam_type = $this->model->getExamType($exam_id);
+            $exam_title = $this->model->getExamTitle($exam_id);
+            $this->view->render('exams/view', array(
+                'rows' => $rows, 'exam_type' => $exam_type, 'exam_title' => $exam_title, 'exam_id' => $exam_id, 'group_number' => $group_number)
+            );
         }
         else {
-            $this->model->updateStudentMarks();
-            header("Location:/exam/group/$group_number");
+            $this->model->updateStudentMarks($exam_id);
+            header("Location:/exam/group/$group_number/$exam_id");
         }
     }
 

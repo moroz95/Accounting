@@ -14,13 +14,19 @@ class ExamModel extends Model
      * @param $sort
      * @return array
      */
-    public function viewExams($sort)
+    public function getExamsData($sort)
     {
-        $exams = mysqli_query($this->connection, "select * from `exams`  order by exam_date $sort");
-        while ($row = mysqli_fetch_array($exams)) {
-            $rows[] = $row;
+        if ($sort == "DESC")
+        {
+            $stmt = $this->connection->query("select * from `exams`  order by exam_date DESC");
         }
-        return $rows;
+        else
+        {
+            $stmt = $this->connection->query("select * from `exams`  order by exam_date ASC");
+        }
+
+        $exams = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $exams;
 
     }
 
@@ -28,22 +34,25 @@ class ExamModel extends Model
      * @param $exam_id
      * @return array
      */
-    public function viewEditForm($exam_id)
+    public function getExamDataById($exam_id)
     {
-        $exams = mysqli_query($this->connection, "SELECT * FROM `exams` WHERE `id`= $exam_id ");
-        $row = mysqli_fetch_array($exams);
-        return $row;
+        $exam_data = array();
+        $stm = $this->connection->prepare("SELECT * FROM `exams` WHERE `id`= ? ");
+        $stm->execute(array($exam_id));
+        $exam_data = $stm->fetch();
+        return $exam_data;
     }
 
     /**
+     * @param $data
      * @param $exam_id
+     * @return bool
      */
-    public function update($exam_id)
+    public function updateExam($data, $exam_id)
     {
-        foreach ($_POST as $key => $value) {
-            $$key = iconv("utf-8", "cp1251", $value);
-        }
-        mysqli_query($this->connection, "UPDATE exams SET exam_title='$examName', exam_type='$examType',exam_date='$examDate',exam_teacher='$examTeacher' WHERE id='$exam_id'");
+        $stm = $this->connection->prepare("UPDATE exams SET exam_title=:examName, exam_type=:examType,exam_date=:examDate,exam_teacher=:examTeacher WHERE id=:exam_id");
+        $stm->execute(array('examName'=>$data['examName'],'examType'=>$data['examType'], 'examDate'=>$data['examDate'], 'examTeacher' => $data['examTeacher'], 'exam_id' => $exam_id));
+        return $stm->rowCount();
     }
 
     /**
@@ -52,25 +61,26 @@ class ExamModel extends Model
      */
     public function delete($exam_id)
     {
-        $count_evals = mysqli_query($this->connection, "SELECT COUNT(`exam_id`) FROM `exams_eval` WHERE `exam_id`=$exam_id");
-        $temp = mysqli_fetch_array($count_evals);
-        $exams_count = $temp[0];
-
+        $stm = $this->connection->prepare("SELECT COUNT(`exam_id`) FROM `exams_eval` WHERE `exam_id`=?");
+        $stm->execute(array($exam_id));
+        $exams_count = $stm->fetch()[0];
         if ($exams_count > 0) {
             return false;
         } else {
-            return mysqli_query($this->connection, "DELETE FROM `exams` WHERE `id`='$exam_id'");
+            $stm = $this->connection->prepare("DELETE FROM `exams` WHERE `id`=?");
+            return $stm->execute(array($exam_id));
         }
 
     }
 
     /**
      * @return array
+     *
      */
     public function viewGroups()
     {
-        $groups = mysqli_query($this->connection, "select * from `groups`");
-        while ($temp = mysqli_fetch_array($groups)) {
+        $stm = $this->connection->query("select `group_number` from `groups`");
+        while ($temp = $stm->fetch()) {
             $rows[] = $temp;
         }
         return $rows;
@@ -80,86 +90,91 @@ class ExamModel extends Model
      * @param $group_number
      * @return array
      */
-    public function getExamData($group_number)
+    public function getExamDataByGroup($group_number)
     {
-        $students = mysqli_query($this->connection, "SELECT * FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = $group_number");
-
-        while ($temp = mysqli_fetch_array($students)) {
-            $rows[] = $temp;
-        }
+        $stm = $this->connection->prepare("SELECT * FROM `students` INNER JOIN `students_groups` ON(`students`.`id` = `students_groups`.`student`) WHERE `students_groups`.`student_group` = ?");
+        $stm->execute(array($group_number));
+        $rows = $stm->fetchAll();
         return $rows;
     }
 
     /**
-     * @param $exam_title
+     * @param $exam_id
      * @return array
      */
-    public function getExamType($exam_title)
+    public function getExamType($exam_id)
     {
-        $exam_title = iconv("utf-8", "cp1251", $exam_title);
-        $exam_type = mysqli_query($this->connection, "SELECT `exam_type` FROM `exams` WHERE `exam_title`='$exam_title'");
-        return mysqli_fetch_array($exam_type);
+        $stm = $this->connection->prepare("SELECT `exams`.`exam_type` from `exams` WHERE `exams`.`id`=?");
+        $stm->execute(array($exam_id));
+        $exam_type = $stm->fetch();
+        return $exam_type;
     }
 
     /**
-     * @param $exam_title
+     * @param $exam_id
      * @return mixed
+     *
      */
-    public function getExamId($exam_title)
+    public function getExamTitle($exam_id)
     {
-        $exam_title = iconv("utf-8", "cp1251", $exam_title);
-        $exam =  mysqli_query($this->connection, "SELECT * FROM `exams` WHERE `exam_title`='$exam_title'");
-        $ex_row = mysqli_fetch_array($exam);
-        $exam_id = $ex_row[0];
-        return $exam_id;
+        $stm = $this->connection->prepare("SELECT `exams`.`exam_title` from `exams` WHERE `exams`.`id` = ?");
+        $stm->execute(array($exam_id));
+        $exam_id = $stm->fetch();
+        return $exam_id[0];
     }
 
     /**
-     * TODO: new algorithm
+     * @param $exam_id
      *
-     *
+     * TODO remove double execute
      */
-    public function updateStudentMarks()
+    public function updateStudentMarks($exam_id)
     {
-        $keys = array_keys($_POST);
-        $exid = $this->getExamId($_SESSION['exam_title']);
-        for ($n=0; $n < count($keys); $n++) {
-            $a = $exid; //id экзамена
-            $b = $keys[$n]; //студент
-            $c = $_POST[$keys[$n]]; //оценка
-            $eva = mysqli_query($this->connection, "SELECT COUNT(`exam_eval`) FROM `exams_eval` WHERE `student`=$b AND `exam_id`=$a");
-            $ev = mysqli_fetch_array($eva);
-            if ($ev[0] > 0) {
-                mysqli_query($this->connection, "UPDATE `exams_eval` SET `exam_eval`='$c' WHERE `student`='$b' AND `exam_id`=$a ");
+        foreach (Validator::$post_data as $student_id => $mark) {
+            if (Validator::isNumber($mark)) {
+                $stm = $this->connection->prepare("SELECT COUNT(`exam_eval`) FROM `exams_eval` WHERE `student`=? AND `exam_id`=?");
+                $stm->execute(array($student_id, $exam_id));
+                $ev = $stm->fetch();
+                if ($ev[0] > 0) {
+                    $stm = $this->connection->prepare("UPDATE `exams_eval` SET `exam_eval`=? WHERE `student`=? AND `exam_id`=? ");
+                    $stm->execute(array($mark, $student_id, $exam_id));
+                } else {
+                    $stm = $this->connection->prepare("INSERT INTO `exams_eval`(`exam_id`, `student`, `exam_eval`) VALUES (?,?,?)");
+                    $stm->execute(array($exam_id, $student_id, $mark));
+                }
             }
-            else {
-                mysqli_query($this->connection, "INSERT INTO `exams_eval`(`exam_id`, `student`, `exam_eval`) VALUES ($a,$b,$c)");
-            }
-
         }
     }
 
     /**
      * @param $student_id
+     * @param $exam_id
      * @return mixed
      */
-    public function getStudentMark($student_id, $exam_title)
+    public function getStudentMark($student_id, $exam_id)
     {
-        $exam_id = $this->getExamId($exam_title);
-        $result = mysqli_query($this->connection, "SELECT `exam_eval` FROM `exams_eval` WHERE `student`=$student_id AND `exam_id`=$exam_id");
-        $result = mysqli_fetch_array($result);
-        return $result[0];
+        $stm = $this->connection->prepare("SELECT `exams_eval`.`exam_eval` FROM `exams_eval` WHERE `exams_eval`.`student` = ? AND `exams_eval`.`exam_id` = ?");
+        $stm->execute(array($student_id, $exam_id));
+        $result = $stm->fetch()[0];
+        return $result;
     }
 
     /**
-     *
+     * @param $data
      */
-    public function addExam()
+    public function addExam($data)
     {
-        foreach ($_POST as $key => $value) {
-            $$key = iconv("utf-8", "cp1251", $value);
+        extract($data);
+        $stm = $this->connection->prepare("INSERT INTO `exams`(`exam_title`, `exam_type`, `exam_date`, `exam_teacher`) VALUES (?, ?, ?, ?)");
+        $stm->execute(array($examName, $examType, $examDate, $examTeacher));
+    }
+
+    public function setStudentsMarks($students, $exam_id)
+    {
+        foreach ($students as &$student)
+        {
+            $student['mark'] = $this->getStudentMark($student[0], $exam_id);
         }
-        
-        mysqli_query($this->connection, "INSERT INTO `exams`(`exam_title`, `exam_type`, `exam_date`, `exam_teacher`) VALUES ('$examName','$examType','$examDate','$examTeacher')");
+        return $students;
     }
 }

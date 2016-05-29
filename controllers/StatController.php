@@ -19,24 +19,23 @@ class StatController extends Controller
     {
         $groups = $this->model->getGroupsData();
         $exams = $this->model->getExamsData();
-        $content = '../views/stats/index.php';
-        include '../views/main.php';
+        $this->view->render('stats/index', array('groups' =>$groups, 'exams' => $exams));
     }
 
     function actionSheet()
     {
         $students = $this->model->getStudentsData($_GET['group_select']);
         $exam_data = $this->model->getExamData($_GET['exam_select']);
-        $content = '../views/stats/sheet.php';
-        include '../views/main.php';
+        $students = $this->model->setStudentsMark($students, $exam_data['exam_title']);
+        $this->view->render('stats/sheet', array('students' => $students, 'exam_data' => $exam_data));
 
     }
 
     function actionProgress()
     {
         $students = $this->model->getStudentsData($_GET['group_select']);
-        $content = '../views/stats/progress.php';
-        include '../views/main.php';
+        $students = $this->model->setAverageData($students);
+        $this->view->render('stats/progress', array('students' => $students));
     }
     
     function actionAverage()
@@ -44,8 +43,6 @@ class StatController extends Controller
         $count = $this->model->countStudents($_GET['group_select']);
         $sum = $this->model->getGroupSum($_GET['group_select']);
         $status = $this->model->getGroupStatus($sum, $count);
-        $content = '../views/stats/average.php';
-        include '../views/main.php';
-
+        $this->view->render('stats/average', array('count' => $count, 'sum' => $sum, 'status' => $status));
     }
 }

@@ -26,20 +26,14 @@ class Model
     function __construct()
     {
         require_once '../db/db_settings.php';
-        $this->connection = mysqli_connect(
-            $db_host,
-            $db_username,
-            $db_password,
-            $db_name);
-
-        mysqli_query($this->connection, "SET character_set_results = 'utf8', character_set_client = 'cp1251', character_set_connection = 'cp1251', character_set_database = 'cp1251', character_set_server = 'cp1251'");
-        mysqli_query($this->connection, 'set collation_connection="utf8_general_ci"');
-        if (!$this->connection) {
-            printf("Невозможно подключиться к базе данных. Код ошибки: %s\n", mysqli_connect_error());
+        try {
+            $this->connection = new PDO("mysql:host=$db_host;dbname=$db_name", $db_username, $db_password);
+        } catch (PDOException $e) {
+            echo "Connection error.";
         }
+        $this->connection->query("SET character_set_results = 'utf8', character_set_client = 'cp1251', character_set_connection = 'cp1251', character_set_database = 'cp1251', character_set_server = 'cp1251'");
+        $this->connection->query('set collation_connection="utf8_general_ci"');
     }
     
     
-
-
 }

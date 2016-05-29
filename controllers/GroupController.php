@@ -9,45 +9,36 @@
  * @package Group
  * @subpackage Controller
  */
-
-
 class GroupController extends Controller
 {
     /**
      * Action to show groups
      *
-     * @param string $sort  ASC or DESC sort
+     * @param string $sort ASC or DESC sort
      */
     function actionIndex($sort)
     {
-        $rows = $this->model->getGroupNumbers($sort);
-        $content = '../views/groups/index.php';
-        include '../views/main.php';
+        $group_numbers = $this->model->getGroupNumbers($sort);
+        $this->view->render('groups/index', array('group_numbers' => $group_numbers));
     }
 
     /**
      * Action to show edit form
+     * in case of POST request to update group and redirect to index
      *
      * @param integer $group_number current group number
      */
     function actionEdit($group_number)
-    {;
-        $row = $this->model->getGroupData($group_number);
-        $content = '../views/groups/edit.php';
-        include '../views/main.php';
-
-    }
-
-    /**
-     * Action to update group
-     * redirect to actionIndex
-     *
-     * @param integer $group_number current group number
-     */
-    function actionUpdate($group_number)
     {
-        $this->model->update($group_number, $_POST['groupNumber'], $_POST['formationDate']);
-        header('Location:/');
+        Validator::setPost();
+        if (Validator::validateId(Validator::$post_data['groupNumber'])) {
+            $this->model->updateGroup($group_number, Validator::$post_data['groupNumber'], Validator::$post_data['formationDate']);
+            header('Location:/groups/index');
+        } else {
+            $group_data = $this->model->getGroupData($group_number);
+            $this->view->render('groups/edit', array('group_data' => $group_data, 'group_number' => $group_number));
+        }
+
     }
 
     /**
@@ -58,8 +49,8 @@ class GroupController extends Controller
      */
     function actionDelete($group_number)
     {
-        $this->model->delete($group_number);
-        header('Location:/');
+        $this->model->deleteGroup($group_number);
+        header('Location:/groups/index');
     }
 
     /**
@@ -68,15 +59,17 @@ class GroupController extends Controller
      */
     function actionAdd()
     {
-        $content = '../views/groups/add.php';
-        include '../views/main.php';
-        if(isset($_POST['groupNumber']) && isset($_POST['formationDate']))
-        {
-            if(!($this->model->add($_POST['groupNumber'], $_POST['formationDate']))){
-                echo "Группа уже существует, ошибка";
+        $error = false;
+        Validator::setPost();
+
+        if (Validator::$post_data) {
+            if (!($this->model->addGroup(Validator::$post_data['groupNumber'], Validator::$post_data['formationDate']))) {
+                $error = "Группа уже существует, ошибка";
             }
-            else header('Location:/');
         }
+
+        $this->view->render('groups/add', array(), $error);
+
     }
 
     /**
@@ -86,11 +79,13 @@ class GroupController extends Controller
      */
     function actionView($group_number)
     {
-        $rows = $this->model->viewStudents($group_number);
-        $content = '../views/groups/view.php';
-        include '../views/main.php';
-    }
+        $group_number = ($group_number == false) ? (int)$group_number : $group_number;
+        $rows = $this->model->getStudents($group_number);
 
+        $error = Validator::isNumber($group_number) ? false : 'Группа не существует';
+
+        $this->view->render('groups/view', array('group_number' => $group_number, 'rows' => $rows), $error);
+    }
 
 
 }
